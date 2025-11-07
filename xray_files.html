@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Ray Files</title>
+    <link rel="stylesheet" href="styles.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Variables are defined in styles.css, but repeated for clarity */
+        :root {
+        --primary-purple: #8A2BE2; /* The color of the FAB */
+        --inactive-gray: #999999; /* Target color for inactive links */
+        --text-color: #1a1a1a;
+    }
+
+        /* HEADER ALIGNMENT: Center the title but keep the back and action icons */
+        .page-header-row {
+            padding: 0 40px; 
+            margin-top: 40px; 
+            margin-bottom: 30px;
+            display: grid;
+            /* Defines three areas: Back, Title, Actions */
+            grid-template-columns: auto 1fr auto; 
+            align-items: center;
+        }
+        
+        /* Position the Back Button */
+        .back-button {
+            grid-column: 1; /* First column */
+            text-decoration: none;
+            color: var(--text-color);
+            font-size: 24px;
+            margin-right: 20px;
+        }
+
+        /* Center the Page Title */
+        .page-title {
+            grid-column: 2; /* Second column (takes up available space) */
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        /* Position the Top Actions (Upload) */
+        .top-actions {
+            grid-column: 3; /* Third column */
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        /* SEARCH BAR STYLES: Centered and Larger */
+        .search-bar {
+            max-width: 800px; 
+            margin: 0 auto 40px; /* Auto margins center it horizontally */
+            padding: 18px 25px; 
+            font-size: 20px;
+        }
+        .search-bar i {
+            font-size: 20px;
+        }
+        .search-bar input {
+            font-size: 20px; 
+            padding: 0 15px;
+            border: none;
+            background: transparent;
+            outline: none;
+            flex-grow: 1;
+        }
+
+        /* Empty state styles */
+        .empty-state {
+            text-align: center;
+            padding: 100px 40px;
+            color: var(--secondary-text);
+        }
+        .empty-state i {
+            font-size: 60px;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+        .empty-state p {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        /* BOTTOM NAVIGATION STYLES: Centering Fix */
+        .bottom-nav {
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+            max-width: 1000px; 
+            margin: 0 auto; /* CENTER THE NAV BAR HORIZONTALLY */
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background-color: white;
+            /* Reduced vertical padding to match the screenshot's compactness */
+            padding: 5px 0 10px; 
+            /* Soft top border instead of a shadow, as suggested by the screenshot's lighter transition */
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.05); 
+            height: 75px; 
+            z-index: 1000;
+        }
+        .nav-item i {
+            font-size: 24px; 
+            margin-bottom: 2px; /* Close gap between icon and text */
+        }
+
+/* ACTIVE STATE: Keep active link dark or purple, depending on preference. 
+   Assuming 'Record' is active and dark gray text based on initial image. */
+        .nav-item.active {
+            color: var(--text-color); /* Dark gray/black for active link text */
+        }
+        .nav-item.active i {
+            color: var(--text-color); /* Dark gray/black for active icon */
+        }
+
+        /* Floating Action Button (FAB) */
+        .nav-fab {
+            width: 60px; /* Sizing to match the screenshot */
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--primary-purple); 
+            color: white;
+            /* Crucial: White ring effect using a background shadow or box-shadow */
+            border: none; 
+            box-shadow: 0 0 0 10px white, 0 4px 8px rgba(0, 0, 0, 0.1); 
+            
+            position: relative;
+            top: -20px; /* Lift it precisely to align with the ring bottom */
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .nav-fab i {
+            font-size: 28px; 
+        }
+        /* --- MOBILE FALLBACK ADJUSTMENTS --- */
+        @media (max-width: 600px) {
+            /* ... (Existing mobile styles for .bottom-nav, .nav-item, etc.) ... */
+
+            .bottom-nav {
+                margin: 0; 
+                max-width: 420px;
+                border-bottom-left-radius: 40px; 
+                border-bottom-right-radius: 40px;
+            }
+            .nav-fab {
+                width: 55px; 
+                height: 55px;
+                top: -15px; /* Adjust lift for smaller screen */
+                box-shadow: 0 0 0 8px white, 0 4px 8px rgba(0, 0, 0, 0.1); 
+            }
+            .nav-item {
+                margin-top: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <section class="main-content">
+            
+            <div class="page-header-row">
+                <a href="index.html" class="back-button" title="Go back to Record File"><i class="fas fa-arrow-left"></i></a>
+                
+                <h1 class="page-title">X-Ray Files</h1>
+                
+                <div class="top-actions">
+                    <i class="fas fa-upload" style="font-size: 26px; color: var(--secondary-text);"></i> 
+                </div>
+            </div>
+
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search X-Ray files...">
+                <i class="fas fa-filter"></i>
+            </div>
+
+            <div class="empty-state">
+                <i class="fas fa-folder-open"></i>
+                <p>No X-Ray files stored yet.</p>
+                <p style="font-size: 14px; color: #999;">Tap the upload icon to add your first report.</p>
+            </div>
+
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="index.html" class="nav-item"> 
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <a href="index.html" class="nav-item active"> 
+                <i class="fas fa-folder-open"></i>
+                <span>Record</span>
+            </a>
+            <button class="nav-fab" style="background-color: var(--primary-purple);">
+                <i class="fas fa-comment-dots"></i>
+            </button>
+            <a href="booking.html" class="nav-item">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Booking</span>
+            </a>
+            <a href="profile.html" class="nav-item"> 
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </a>
+        </nav>
+    </div>
+    <script src="report-list.js"></script>
+</body>
+</html>

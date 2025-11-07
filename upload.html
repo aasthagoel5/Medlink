@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Medical File</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> 
+    <style>
+        :root {
+            --primary-purple: #8A2BE2;
+            --light-bg: #f7f8fa;
+            --text-color: #1a1a1a;
+            --secondary-text: #666;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--light-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .upload-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            color: var(--primary-purple);
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        select, input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="file"] {
+            padding: 10px;
+        }
+        .btn-upload {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 20px;
+        }
+        .btn-upload:hover {
+            background: #6a1aae;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: var(--secondary-text);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <a href="index.html" class="back-link" style="text-align: left; margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Back to Records</a>
+        <h2>Upload Medical Report</h2>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="fileCategory">Category</label>
+                <select id="fileCategory" required>
+                    <option value="" disabled selected>Select Report Type</option>
+                    <option value="X-Ray">X-Ray</option>
+                    <option value="Diagnostic reports">Diagnostic reports</option>
+                    <option value="Med reports">Med reports</option>
+                    <option value="All Blood test reports">All Blood test reports</option>
+                    <option value="Lab test">Lab test</option>
+                    <option value="Other reports">Other reports</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="medicalFile">Select File (.pdf, .jpg, .png)</label>
+                <input type="file" id="medicalFile" name="medicalFile" accept=".pdf, .jpg, .jpeg, .png" required>
+            </div>
+            
+            <button type="submit" class="btn-upload" id="uploadButton">
+                <i class="fas fa-cloud-upload-alt"></i> Upload File
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const uploadButton = document.getElementById('uploadButton');
+    
+    // 1. Check for Token (Authentication)
+    const token = localStorage.getItem('medlink_token');
+    if (!token) {
+        alert('Authentication failed. Please log in.');
+        window.location.href = 'second.html'; // Redirect to login page
+        return;
+    }
+
+    // 2. Prepare FormData
+    const formData = new FormData();
+    const fileInput = document.getElementById('medicalFile');
+    const category = document.getElementById('fileCategory').value;
+
+    if (!fileInput.files.length || !category) {
+        alert('Please select a file and a category.');
+        return;
+    }
+
+    // Append file and category data
+    // NOTE: 'medicalFile' must match the name used in multer.single('medicalFile') on the server.
+    formData.append('medicalFile', fileInput.files[0]); 
+    formData.append('category', category);
+
+    // Disable button for feedback
+    uploadButton.disabled = true;
+    uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+    try {
+        // 3. Send Request to Backend
+        const response = await fetch('http://localhost:3000/api/upload', {
+            method: 'POST',
+            // IMPORTANT: Do NOT set Content-Type header when using FormData. 
+            // The browser sets it automatically, including the necessary boundary.
+            headers: {
+                'Authorization': `Bearer ${token}` // Include JWT token
+            },
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert('File uploaded successfully!');
+            // Optional: Redirect back to the main file index page
+            window.location.href = 'index.html'; 
+        } else {
+            // Handle server-side errors (e.g., file limit, invalid token)
+            alert(`Upload failed: ${result.message || 'Server error'}`);
+        }
+    } catch (error) {
+        console.error('Error during file upload:', error);
+        alert('A network error occurred during upload. Please try again.');
+    } finally {
+        // Re-enable button
+        uploadButton.disabled = false;
+        uploadButton.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Upload File';
+    }
+});
+    </script>
+</body>
+</html>

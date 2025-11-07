@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vitals History</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0072ff;
+            --light-bg: #f7f8fa;
+            --text-color: #1a1a1a;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--light-bg);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .vitals-history-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 25px;
+        }
+        .back-link {
+            display: block;
+            text-align: left;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            text-decoration: none;
+        }
+        .vitals-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .vitals-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #ffffff;
+            transition: box-shadow 0.2s;
+        }
+        .vitals-item:hover {
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+        .date-time {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            border-bottom: 1px dashed #e0e0e0;
+            padding-bottom: 5px;
+        }
+        .vitals-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            font-size: 15px;
+            color: var(--text-color);
+        }
+        .vital-reading strong {
+            display: block;
+            font-size: 18px;
+            color: #333;
+        }
+        .notes {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #f0f0f0;
+            font-style: italic;
+            color: #666;
+            font-size: 14px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 50px 0;
+            color: #999;
+        }
+        .empty-state i {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="vitals-history-container">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        <h2>Your Vitals History</h2>
+        
+        <div id="vitalsOutput">
+            <div class="empty-state">
+                <i class="fas fa-sync fa-spin"></i>
+                <p>Loading vital signs history...</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // --- Function to Handle Vitals Submission (from record_vitals.html) ---
+async function handleVitalsSubmission(e) {
+    e.preventDefault();
+
+    const recordButton = document.getElementById('recordButton');
+    const token = localStorage.getItem('medlink_token');
+
+    if (!token) {
+        alert('Authentication failed. Please log in.');
+        window.location.href = 'second.html'; 
+        return;
+    }
+
+    const data = {
+        systolic_bp: parseInt(document.getElementById('systolicBp').value),
+        diastolic_bp: parseInt(document.getElementById('diastolicBp').value),
+        heart_rate: parseInt(document.getElementById('heartRate').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        weight: parseFloat(document.getElementById('weight').value),
+        notes: document.getElementById('notes').value
+    };
+
+    recordButton.disabled = true;
+    recordButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const response = await fetch('http://localhost:3000/api/record/vital', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert('Vitals recorded successfully!');
+            document.getElementById('vitalsForm').reset(); 
+            // Optional: Redirect to history page after successful submission
+            // window.location.href = 'vitals_history.html'; 
+        } else {
+            alert(`Record failed: ${result.message || 'Server error'}`);
+        }
+    } catch (error) {
+        console.error('Error recording vitals:', error);
+        alert('A network error occurred while saving vitals. Please try again.');
+    } finally {
+        recordButton.disabled = false;
+        recordButton.innerHTML = '<i class="fas fa-heartbeat"></i> Save Vitals';
+    }
+}
+
+
+// --- Function to Handle Vitals History Retrieval (for vitals_history.html) ---
+async function fetchVitalsHistory() {
+    const vitalsOutput = document.getElementById('vitalsOutput');
+    const token = localStorage.getItem('medlink_token');
+
+    if (!token) {
+        vitalsOutput.innerHTML = '<div class="empty-state"><i class="fas fa-lock"></i><p>Please log in to view history.</p></div>';
+        return;
+    }
+
+    try {
+        const response = await fetch('http://localhost:3000/api/vitals/hitory', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            // Specifically handle the 404 No data found case
+            if (response.status === 404) {
+                 vitalsOutput.innerHTML = '<div class="empty-state"><i class="fas fa-history"></i><p>No vital records found yet.</p><p>Use the Vitals Input page to add your first record.</p></div>';
+                 return;
+            }
+            throw new Error(result.message || response.statusText);
+        }
+
+        if (result.data.length === 0) {
+            vitalsOutput.innerHTML = '<div class="empty-state"><i class="fas fa-history"></i><p>No vital records found yet.</p></div>';
+            return;
+        }
+
+        // --- Build HTML List ---
+        let listHTML = '<ul class="vitals-list">';
+        result.data.forEach(vital => {
+            const recordedDate = new Date(vital.recorded_at).toLocaleString();
+            
+            listHTML += `
+            <li class="vitals-item">
+                <div class="date-time">${recordedDate}</div>
+                <div class="vitals-details">
+                    <div class="vital-reading">BP (Systolic/Diastolic): <strong>${vital.systolic_bp}/${vital.diastolic_bp} mmHg</strong></div>
+                    <div class="vital-reading">Heart Rate: <strong>${vital.heart_rate} bpm</strong></div>
+                    <div class="vital-reading">Temperature: <strong>${vital.temperature} °C</strong></div>
+                    <div class="vital-reading">Weight: <strong>${vital.weight} kg</strong></div>
+                </div>
+                ${vital.notes ? `<div class="notes">Notes: ${vital.notes}</div>` : ''}
+            </li>`;
+        });
+        listHTML += '</ul>';
+        vitalsOutput.innerHTML = listHTML;
+
+    } catch (error) {
+        console.error('Error fetching vitals history:', error);
+        vitalsOutput.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle" style="color: red;"></i><p>Error loading history. Please check server.</p></div>';
+    }
+}
+
+
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if the current page is the vitals input form
+    const vitalsForm = document.getElementById('vitalsForm');
+    if (vitalsForm) {
+        vitalsForm.addEventListener('submit', handleVitalsSubmission);
+    } 
+    
+    // Check if the current page is the vitals history page
+    const vitalsOutput = document.getElementById('vitalsOutput');
+    if (vitalsOutput) {
+        fetchVitalsHistory();
+    }
+});
+    </script>
+</body>
+</html>

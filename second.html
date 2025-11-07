@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login Page</title>
+  <style>
+    * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background: linear-gradient(to right, #00c6ff, #0072ff);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+}
+
+.login-box {
+  background: white;
+  border-radius: 20px;
+  padding: 40px 30px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+.logo {
+  font-size: 40px;
+  color: #00bcd4;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin-bottom: 30px;
+  color: #333;
+}
+
+label {
+  display: block;
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 5px;
+  margin-top: 15px;
+  color: #0072ff;
+}
+
+.input-group {
+  position: relative;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 10px 35px 10px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.input-group .icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.forgot-password {
+  text-align: right;
+  margin-top: 5px;
+}
+
+.forgot-password a {
+  font-size: 12px;
+  color: #0072ff;
+  text-decoration: none;
+}
+
+.btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  background-color: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.btn:hover {
+  background-color: #0097a7;
+}
+
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  color: #aaa;
+  position: relative;
+}
+
+.divider span {
+  background: white;
+  padding: 0 10px;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: #ccc;
+  top: 50%;
+  left: 0;
+  z-index: -1;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border: 1px solid #ccc;
+  color: #333;
+}
+
+.google-btn img {
+  width: 20px;
+  margin-right: 10px;
+}
+
+.signup-text {
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.signup-text a {
+  color: #0072ff;
+  text-decoration: none;
+}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="login-box">
+      <div class="logo">+</div>
+      <h2>Welcome Back!</h2>
+
+      <form id="loginForm">
+        <label for="email">Email or No. Handphone</label>
+        <div class="input-group">
+          <input type="email" id="email" placeholder="svarda@gmail.co.id" required />
+          <span class="icon">&#128100;</span>
+        </div>
+
+        <label for="password">Password</label>
+        <div class="input-group">
+          <input type="password" id="password" placeholder="Password" required />
+          <span class="icon toggle-password">&#128065;</span>
+        </div>
+
+        <div class="forgot-password">
+          <a href="#">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn">SIGN IN</button>
+
+        <div class="divider"><span>OR</span></div>
+
+        <button type="button" class="btn google-btn">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+          Continue with Google
+        </button>
+
+        <p class="signup-text">Don't have an account? <a href="create account.html">Sign Up</a></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="second.js"></script>
+</body>
+</html>

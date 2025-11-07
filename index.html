@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record File</title>
+    <link rel="stylesheet" href="styles.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- GLOBAL STYLES & CONTAINER --- */
+:root {
+    --primary-purple: #8A2BE2; 
+    --light-bg: #f7f8fa; 
+    --text-color: #1a1a1a; 
+    --secondary-text: #666; 
+}
+
+/* Base setup for the PC view, centering the content area */
+body {
+    font-family: 'Poppins', sans-serif; 
+    margin: 0;
+    padding: 0;
+    background-color: var(--light-bg); 
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 1000px; /* Wider MAX WIDTH for PC display */
+    min-height: 100vh; 
+    background-color: white;
+    box-shadow: none; 
+    border-radius: 0;
+    position: relative; 
+    overflow-y: auto;
+    padding-bottom: 80px;
+}
+
+/* --- MEDIA QUERY for Mobile View Fallback --- */
+@media (max-width: 600px) {
+    .app-container {
+        max-width: 420px; 
+        box-shadow: 0 5px 30px rgba(0,0,0,0.15); 
+        border-radius: 40px; 
+    }
+    .page-header-row {
+        padding: 0 20px;
+    }
+    .search-bar {
+        margin: 0 20px 30px;
+    }
+    .file-categories-grid {
+        grid-template-columns: 1fr 1fr; /* 2 columns on mobile */
+        padding: 0 20px;
+    }
+    .bottom-nav {
+        max-width: 420px;
+        border-bottom-left-radius: 40px; 
+        border-bottom-right-radius: 40px;
+    }
+}
+
+
+/* --- PAGE HEADER (PC STYLES) --- */
+.page-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 40px;
+    margin-top: 40px; 
+    margin-bottom: 30px;
+}
+
+.page-title {
+    font-size: 32px; 
+    font-weight: 700; 
+    color: var(--text-color);
+}
+
+.top-actions i {
+    font-size: 26px; 
+    margin-left: 20px;
+    color: var(--secondary-text);
+}
+
+
+/* --- SEARCH BAR (PC STYLES) --- */
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: #f0f0f0; 
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin: 0 40px 40px; 
+    color: var(--secondary-text);
+}
+.search-bar input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    padding: 0 15px;
+    outline: none;
+    font-size: 18px; 
+    color: var(--text-color);
+}
+.search-bar i.fa-filter {
+    color: var(--text-color);
+}
+
+
+/* --- FILE CATEGORIES GRID & CARDS (PC STYLES) --- */
+.file-categories-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 columns on desktop */
+    gap: 25px; 
+    padding: 0 40px;
+    padding-bottom: 40px; 
+}
+
+/* Card Container */
+.file-card {
+    background-color: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); 
+    height: 200px; 
+    position: relative; /* Essential for positioning the menu icon */
+    display: block;
+}
+
+/* New: Link wrapper that covers the main card area */
+.card-link {
+    text-decoration: none; 
+    color: inherit;      
+    display: flex;       
+    flex-direction: column;
+    height: 100%;        
+    justify-content: space-between;
+    padding-right: 20px; /* Ensure space for the menu icon */
+}
+
+/* New: Ellipsis Menu Icon Positioning (Outside the link) */
+.card-menu-icon {
+    position: absolute;
+    top: 20px; 
+    right: 20px; 
+    font-size: 18px;
+    color: #ccc;
+    z-index: 10; 
+    cursor: pointer;
+}
+
+/* Card Content Styling */
+.card-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+.icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 22px; 
+}
+
+/* Icon Colors */
+.purple { background-color: #7B3EED; }
+.pink { background-color: #FF5A73; }
+.gray { background-color: #A9B3BD; }
+.red { background-color: #FF3333; }
+.orange { background-color: #FFA500; }
+.dark-gray { background-color: #4C596D; }
+
+.file-card h2 {
+    font-size: 18px; 
+    font-weight: 600; 
+    color: var(--text-color);
+    margin: 15px 0 0; 
+    line-height: 1.2;
+}
+
+.file-card .file-count {
+    font-size: 14px; 
+    font-weight: 500;
+    color: var(--secondary-text);
+    margin: 5px 0 0;
+}
+
+.file-card .file-size {
+    font-size: 14px;
+    color: #999; 
+    font-weight: 400;
+    margin-top: 8px;
+}
+
+
+/* --- BOTTOM NAVIGATION (PC STYLES) --- */
+.bottom-nav {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    max-width: 1000px; 
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: white;
+    padding: 10px 0;
+    box-shadow: 0 -5px 10px rgba(0,0,0,0.05);
+    height: 70px;
+    z-index: 1000;
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: #999;
+    font-size: 14px; 
+}
+/* ... rest of nav item styles ... */
+
+.nav-fab {
+    width: 70px; 
+    height: 70px;
+    border-radius: 50%;
+    background-color: var(--primary-purple); 
+    color: white;
+    border: 5px solid white; 
+    position: relative;
+    top: -30px; 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+}
+.nav-fab i {
+    font-size: 28px; 
+}
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <section class="main-content">
+            
+            <div class="page-header-row">
+                <h1 class="page-title">Record File</h1>
+                <div class="top-actions">
+                    <i class="fas fa-shopping-cart"></i>
+                    <i class="fas fa-bell"></i>
+                </div>
+            </div>
+
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search your file..">
+                <i class="fas fa-filter"></i>
+            </div>
+
+            <div class="file-categories-grid">
+                
+                <div class="file-card">
+                    <a href="xray_files.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box purple">
+                                <i class="fas fa-file-image"></i>
+                            </div>
+                        </div>
+                        <h2>X-Ray</h2>
+                        <p class="file-count" id="files-xray">15 files</p>
+                        <p class="file-size">20.3 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+
+                <div class="file-card">
+                    <a href="diagnostic_files.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box pink">
+                                <i class="fas fa-file-medical-alt"></i>
+                            </div>
+                        </div>
+                        <h2>Diagnostic reports</h2>
+                        <p class="file-count" id="files-diagnostic">5 files</p>
+                        <p class="file-size">17.5 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+                
+                <div class="file-card">
+                    <a href="med_reports.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box gray">
+                                <i class="fas fa-notes-medical"></i>
+                            </div>
+                        </div>
+                        <h2>Med reports</h2>
+                        <p class="file-count" id="files-med">27 files</p>
+                        <p class="file-size">32.4 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+                
+                <div class="file-card">
+                    <a href="blood_reports.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box red">
+                                <i class="fas fa-vial"></i>
+                            </div>
+                        </div>
+                        <h2>All Blood test reports</h2>
+                        <p class="file-count" id="files-blood">25 files</p>
+                        <p class="file-size">25.6 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+
+                <div class="file-card">
+                    <a href="lab_test.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box orange">
+                                <i class="fas fa-flask"></i>
+                            </div>
+                        </div>
+                        <h2>Lab test</h2>
+                        <p class="file-count" id="files-lab">16 files</p>
+                        <p class="file-size">18.0 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+
+                <div class="file-card">
+                    <a href="other_reports.html" class="card-link">
+                        <div class="card-header">
+                            <div class="icon-box dark-gray">
+                                <i class="fas fa-folder"></i>
+                            </div>
+                        </div>
+                        <h2>Other reports</h2>
+                        <p class="file-count" id="files-other">9 files</p>
+                        <p class="file-size">10.1 Mb</p>
+                    </a>
+                    <i class="fas fa-ellipsis-v card-menu-icon"></i>
+                </div>
+
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <a href="index.html" class="nav-item active">
+                <i class="fas fa-folder-open"></i>
+                <span>Record</span>
+            </a>
+            <button class="nav-fab" onclick="window.location.href='upload.html'">
+                <i class="fas fa-cloud-upload-alt"></i> </button>
+            <a href="vitals_history.html" class="nav-item">
+                <i class="fas fa-heartbeat"></i> 
+                <span>Vitals</span> </a>
+            <a href="profile.html" class="nav-item"> 
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </a>
+        </nav>
+    </div>
+
+    <script src="script.js"></script> 
+</body>
+</html>

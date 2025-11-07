@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verification Code</title>
+  <style>
+    .verification-container{ box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, #eeedf4, #eceff3);
+  z-index: -1;
+}
+
+.verification-container {
+  max-width: 400px;
+  margin: 80px auto;
+  background-color: #0072ff;
+  border-radius: 12px;
+  padding: 40px 30px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+/* Icon */
+.icon span {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+
+h2 {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.instruction {
+  font-size: 14px;
+  color: #111111;
+  margin-bottom: 25px;
+}
+
+
+.code-inputs {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 25px;
+}
+
+.code-inputs input {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+  text-align: center;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  transition: border-color 0.3s;
+}
+
+.code-inputs input:focus {
+  outline: none;
+  border-color: #ccd7e9;
+}
+
+#confirmBtn {
+  width: 100%;
+  padding: 15px;
+  background-color: #00bcd4;
+  color: hsl(0, 78%, 2%);
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+#confirmBtn:hover {
+  background-color: #d7ffcf;
+}
+
+.resend {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #111111;
+}
+
+.resend a {
+  color: #22319e;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.resend a:hover {
+  text-decoration: underline;
+}
+  </style>
+</head>
+<body>
+  <div class="verification-container">
+    <div class="icon">
+      <span>🤝</span>
+    </div>
+    <h2>Verification</h2>
+    <p class="instruction">Enter the verification code we’ve sent to your<br><strong>email</strong></p>
+    <div class="code-inputs">
+      <input type="text" maxlength="1" />
+      <input type="text" maxlength="1" />
+      <input type="text" maxlength="1" />
+      <input type="text" maxlength="1" />
+    </div>
+    <button id="confirmBtn">Confirm</button>
+    <p class="resend">Didn't receive the code? <a href="#">Resend</a></p>
+  </div>
+  <script src="third.js"></script>
+</body>
+</html>  
+  

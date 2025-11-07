@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Record Vitals</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0072ff; /* Using the blue from your login page for vitals */
+            --light-bg: #f7f8fa;
+            --text-color: #1a1a1a;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--light-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .vitals-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 25px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            flex: 1;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        input:not([type="submit"]), textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .btn-record {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        .btn-record:hover {
+            background: #0056b3;
+        }
+        .back-link {
+            display: block;
+            text-align: left;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="vitals-container">
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back</a>
+        <h2>Record Daily Vitals</h2>
+        
+        <form id="vitalsForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="systolicBp">Systolic BP (mmHg)</label>
+                    <input type="number" id="systolicBp" placeholder="120" required>
+                </div>
+                <div class="form-group">
+                    <label for="diastolicBp">Diastolic BP (mmHg)</label>
+                    <input type="number" id="diastolicBp" placeholder="80" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="heartRate">Heart Rate (bpm)</label>
+                    <input type="number" id="heartRate" placeholder="75" required>
+                </div>
+                <div class="form-group">
+                    <label for="temperature">Temperature (°C)</label>
+                    <input type="number" step="0.1" id="temperature" placeholder="36.5" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="weight">Weight (kg)</label>
+                <input type="number" step="0.1" id="weight" placeholder="70.0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes (Optional)</label>
+                <textarea id="notes" placeholder="Feeling energetic today..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn-record" id="recordButton">
+                <i class="fas fa-heartbeat"></i> Save Vitals
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('vitalsForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const recordButton = document.getElementById('recordButton');
+    
+    // 1. Check for Token
+    const token = localStorage.getItem('medlink_token');
+    if (!token) {
+        alert('Authentication failed. Please log in.');
+        window.location.href = 'second.html'; 
+        return;
+    }
+
+    // 2. Gather Data
+    const data = {
+        systolic_bp: parseInt(document.getElementById('systolicBp').value),
+        diastolic_bp: parseInt(document.getElementById('diastolicBp').value),
+        heart_rate: parseInt(document.getElementById('heartRate').value),
+        temperature: parseFloat(document.getElementById('temperature').value),
+        weight: parseFloat(document.getElementById('weight').value),
+        notes: document.getElementById('notes').value
+    };
+
+    // Disable button for feedback
+    recordButton.disabled = true;
+    recordButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        // 3. Send Request
+        const response = await fetch('http://localhost:3000/api/record/vital', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert('Vitals recorded successfully!');
+            // Clear form and perhaps redirect to history page
+            this.reset(); 
+            // Optional: window.location.href = 'vitals_history.html'; 
+        } else {
+            alert(`Record failed: ${result.message || 'Server error'}`);
+        }
+    } catch (error) {
+        console.error('Error recording vitals:', error);
+        alert('A network error occurred while saving vitals. Please try again.');
+    } finally {
+        // Re-enable button
+        recordButton.disabled = false;
+        recordButton.innerHTML = '<i class="fas fa-heartbeat"></i> Save Vitals';
+    }
+});
+    </script>
+</body>
+</html>
