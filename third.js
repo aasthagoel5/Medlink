@@ -89,7 +89,7 @@ confirmBtn.addEventListener('click', async (e) => {
             localStorage.setItem('medlink_token', result.token); 
             sessionStorage.removeItem('medlink_userId'); // Clean up user ID from session
             
-            window.location.href = '/index.html'; // Redirect to dashboard
+            window.location.href = 'index.html'; // Redirect to dashboard
             
         } else {
             alert(`Verification failed: ${result.message}`);

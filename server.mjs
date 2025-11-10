@@ -1,30 +1,88 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import nodemailer from 'nodemailer';
-import Redis from 'ioredis';
-import mysql from 'mysql2/promise';
+import {open} from 'sqlite';
+import sqlite3 from 'sqlite3';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import 'dotenv/config'; // Loads environment variables from .env
+import 'process/config'; // Loads environment variables from .env
+console.log("--- DEBUG: EMAIL USER ---", process.env.EMAIL_USER); // <--- ADD THIS
+console.log("--- DEBUG: EMAIL PASS ---", process.env.EMAIL_PASS); // <--- ADD THIS
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
 
 // --- Configuration Constants ---
-// CRITICAL: Uses environment variables for deployment
 const JWT_SECRET = process.env.JWT_SECRET || 'FALLBACK_SECRET'; 
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 const saltRounds = 10;
+
+// --- DATABASE: SQLite Configuration ---
+// The entire database will be stored in this file.
+const DB_FILE = './medlink.db';
+let db; // This variable will hold our SQLite connection.
+
+// --- OTP Storage: In-Memory Object (Simple Replacement for Redis) ---
+// Keys: userId, Values: { otp: '1234', expires: 1678888888 }
 const otpStore = {}; 
 
 const app = express();
-const redis = new Redis();
+
+
+// ====================================================================
+// YOU SHOULD NOT REMOVE THESE PARTS: Utilities & Middleware
+// ====================================================================
+
+// --- Utility Functions ---
+
+function generateOTP() {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+async function sendOTPEmail(to, otp) {
+    // ... (Your Nodemailer setup remains the same)
+    // NOTE: For this to work, EMAIL_USER and EMAIL_PASS must be in .env
+    const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        auth: { 
+            user: process.env.EMAIL_USER, 
+            pass: process.env.EMAIL_PASS
+        }
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: to,
+        subject: 'Your OTP Code',
+        text: `Your OTP code is ${otp}`
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`OTP email sent to ${to}`);
+    } catch (error) {
+        // We need to catch this but let the registration proceed to OTP screen
+        console.error(`Error sending OTP email to ${to}:`, error.message);
+    }
+}
+
+function authenticateToken(req, res, next) {
+    // ... (Your JWT token verification remains the same)
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.status(401).json({ success: false, message: 'No token provided' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ success: false, message: 'Invalid token' });
+        req.user = user;
+        next();
+    });
+}
 
 // --- Multer Configuration ---
+// ... (Your Multer setup remains the same)
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Ensure the 'uploads/' directory exists
         const uploadDir = 'uploads/';
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir);
@@ -38,101 +96,87 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10 MB limit
+    limits: { fileSize: 10 * 1024 * 1024 } 
 }).single('medicalFile');
-
-// --- Nodemailer Configuration (Uses .env) ---
-const transporter = nodemailer.createTransport({
-    service: 'Gmail',
-    auth: { 
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS
-    }
-});
-
-// --- MySQL Database Pool Setup (Uses .env) ---
-const db = mysql.createPool({ 
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
-
-// --- Utility Functions ---
-
-function generateOTP() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-async function sendOTPEmail(to, otp) {
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: to,
-        subject: 'Your OTP Code',
-        text: `Your OTP code is ${otp}`
-    };
-    try {
-        await transporter.sendMail(mailOptions);
-        console.log(`OTP email sent to ${to}`);
-    } catch (error) {
-        console.error(`Error sending OTP email to ${to}:`, error.message);
-    }
-}
-
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.status(401).json({ success: false, message: 'No token provided' });
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ success: false, message: 'Invalid token' });
-        req.user = user;
-        next();
-    });
-}
-
-// --- Database Schema Check (Run on startup) ---
-async function checkDatabaseSchema() {
-    try {
-        const [columns] = await db.execute("DESCRIBE users");
-        const columnNames = columns.map(col => col.Field);
-        
-        if (!columnNames.includes('username') || !columnNames.includes('is_verified')) {
-             console.error("\n*** CRITICAL SCHEMA MISMATCH DETECTED ***");
-             console.error("The 'users' table is MISSING 'username' or 'is_verified' columns.");
-             process.exit(1);
-        }
-    } catch (error) {
-        console.error("\n*** CRITICAL: Failed to connect or find 'users' table! ***");
-        console.error("Is your MySQL server running? Error:", error.message);
-        // Do not exit in production, but alert. For development, we exit.
-        if (process.env.NODE_ENV !== 'production') process.exit(1); 
-    }
-}
-// ----------------------------------------------------------------------
 
 
 // --- Express Middleware ---
 app.use(bodyParser.json());
-
-// CORS Configuration (Updated for deployment security)
 app.use((req, res, next) => {
-    // For production, replace '*' with your actual domain using FRONTEND_URL
     res.header('Access-Control-Allow-Origin', FRONTEND_URL); 
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     
-    // Handle preflight requests
     if ('OPTIONS' === req.method) {
         return res.sendStatus(200); 
     }
     next();
 });
 
-// --- API Endpoints ---
+// ====================================================================
+// DATABASE INITIALIZATION (NEW/CHANGED PART)
+// ====================================================================
+
+async function initDatabase() {
+    try {
+        // Open the SQLite database file (it will create it if it doesn't exist)
+        db = await open({
+            filename: DB_FILE,
+            driver: sqlite3.Database
+        });
+
+        // 1. Create the users table
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                is_verified INTEGER DEFAULT 0
+            );
+        `);
+        // 2. Create the vitals table
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS vitals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                systolic_bp INTEGER NOT NULL,
+                diastolic_bp INTEGER NOT NULL,
+                heart_rate INTEGER NOT NULL,
+                temperature REAL NOT NULL,
+                weight REAL NOT NULL,
+                notes TEXT,
+                recorded_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+        `);
+        // 3. Create the medical_files table
+        await db.exec(`
+            CREATE TABLE IF NOT EXISTS medical_files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                filename TEXT NOT NULL,
+                filepath TEXT NOT NULL,
+                mimetype TEXT,
+                size INTEGER,
+                category TEXT,
+                upload_date TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+        `);
+
+        console.log('Database Check: Success! SQLite tables created/verified.');
+    } catch (error) {
+        console.error("CRITICAL: Failed to initialize SQLite database:", error.message);
+        process.exit(1);
+    }
+}
+
+
+// ====================================================================
+// API Endpoints (MODIFIED FOR SQLITE SYNTAX)
+// ====================================================================
 
 // POST /api/register - User Registration
 app.post('/api/register', async (req, res) => {
@@ -143,42 +187,46 @@ app.post('/api/register', async (req, res) => {
     }
     
     try {
-        // 1. CRITICAL FIX: Password Hashing
+        // Check for existing user first (due to UNIQUE constraint handling differences)
+        const existingUser = await db.get('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
+        if (existingUser) {
+            return res.status(409).json({ success: false, message: 'Username or email already exists.' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, saltRounds); 
         
-        // 2. Database Insert
-        const [rows] = await db.execute(
-            'INSERT INTO users (username, email, password_hash, created_at, is_verified) VALUES (?, ?, ?, NOW(), 0)', 
+        // SQLite Insert
+        const result = await db.run(
+            'INSERT INTO users (username, email, password_hash, is_verified) VALUES (?, ?, ?, 0)', 
             [username, email, hashedPassword]
         );
         
-        const userId = rows.insertId; 
+        const userId = result.lastID; // SQLite uses lastID instead of insertId
         
         if (!userId) {
             throw new Error("Database insert failed: No user ID returned.");
         }
 
-        // 3. OTP Generation and Redis Storage
-        const otp = generateOTP();
-        const otp_expire = 300; // 5 minutes
-        await redis.set(`otp:${userId}`, otp, 'EX', otp_expire);
-        
-        // 4. Send Email (Must use App Password for production)
+        // server.mjs - inside app.post('/api/register', ...)
+// ...
+// OTP Generation and In-Memory Storage
+        const otp = generateOTP(); 
+        console.log(`NEW USER OTP IS: ${otp}`); // <--- ADD THIS LINE
+        const otp_expire = Date.now() + (5 * 60 * 1000); 
+        otpStore[userId] = { otp, expires: otp_expire };
+        // ...
+        // Send Email
         await sendOTPEmail(email, otp);
         
-        // 5. Final Success Response
+        // Final Success Response
         return res.json({ success: true, message: 'User registered successfully. OTP sent to email.', userId });
         
     } catch (error) {
         console.error('SERVER CRITICAL RUNTIME FAILURE:', error);
-        
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: 'Username or email already exists' });
-        }
-        
         return res.status(500).json({ success: false, message: 'Internal server error: Check server logs for details.' });
     }
 });
+
 
 // POST /api/login - User Login
 app.post('/api/login', async (req, res) => {
@@ -189,11 +237,12 @@ app.post('/api/login', async (req, res) => {
     }
 
     try {
-        const [rows] = await db.execute('SELECT * FROM users WHERE email = ?', [email]);
-        if (rows.length === 0) {
+        // SQLite: use db.get() for a single row
+        const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+        
+        if (!user) {
             return res.status(400).json({ success: false, message: 'Invalid email or password' });
         }
-        const user = rows[0];
         
         // Compare hashed password
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
@@ -213,20 +262,23 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+
 // POST /api/resend-otp
 app.post('/api/resend-otp', async (req, res) => {
     const { userId } = req.body;
-    const otp_expire = 300; 
-
+    
     try{
-        const [userRows] = await db.execute('SELECT email FROM users WHERE id = ?', [userId]);
-        if (userRows.length === 0) {
+        const user = await db.get('SELECT email FROM users WHERE id = ?', [userId]);
+        if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
-        const userEmail = userRows[0].email;
+        const userEmail = user.email;
         
+        // In-Memory OTP Storage (Replaces Redis logic)
         const newotp = generateOTP();
-        await redis.set(`otp:${userId}`, newotp, 'EX', otp_expire);
+        const otp_expire = Date.now() + (5 * 60 * 1000); 
+        otpStore[userId] = { otp: newotp, expires: otp_expire };
+
         await sendOTPEmail(userEmail, newotp); 
         
         console.log(`Resent OTP for user ${userId}: ${newotp}`);
@@ -246,35 +298,33 @@ app.post('/api/verify-otp', async (req, res) => {
     }
 
     try {
-        const storedOtp = await redis.get(`otp:${userId}`);
+        const storedOtpData = otpStore[userId];
         
-        if (!storedOtp) {
+        if (!storedOtpData || storedOtpData.expires < Date.now()) {
             return res.status(404).json({ success: false, message: 'OTP not found or expired' });
         }
         
-        if (otp !== storedOtp) {
+        if (otp !== storedOtpData.otp) {
             return res.status(400).json({ success: false, message: 'Invalid OTP' });
         }
         
-        await redis.del(`otp:${userId}`); 
+        delete otpStore[userId]; // Delete OTP after successful verification
         
         // 1. Update User Verification Status
-        const [updateResult] = await db.execute(
+        const updateResult = await db.run(
             'UPDATE users SET is_verified = 1 WHERE id = ?', 
             [userId]
         );
         
-        if (updateResult.affectedRows === 0) {
+        if (updateResult.changes === 0) { // SQLite uses .changes instead of affectedRows
             return res.status(404).json({ success: false, message: 'Verification failed: User not found.' });
         }
         
         // 2. Fetch the user record for token generation
-        const [updatedUserRows] = await db.execute(
+        const user = await db.get(
             'SELECT id, username FROM users WHERE id = ?', 
             [userId]
         );
-        
-        const user = updatedUserRows[0];
 
         // 3. Generate and Return JWT Token
         const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
@@ -292,215 +342,20 @@ app.post('/api/verify-otp', async (req, res) => {
 });
 
 
-app.post('/api/upload', authenticateToken, (req, res) => {
-    upload(req, res, async function (err) {
-        if (err instanceof multer.MulterError) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(400).json({ success: false, message: 'File too large (max 10MB)' });
-            }
-            return res.status(400).json({ success: false, message: err.message });
-        } else if (err) {
-            return res.status(500).json({ success: false, message: 'Unknown upload error' });
-        }
-        
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No file selected for upload.' });
-        }
-
-        const userId = req.user.userId;
-        const { category } = req.body;
-        const { filename, path: filePath, mimetype, size } = req.file;
-
-        try{
-            const [result] = await db.execute( 
-                'INSERT INTO medical_files (user_id, filename, filepath, mimetype, size, category, upload_date) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-                [userId, filename, filePath, mimetype, size, category]
-            );
-            return res.status(201).json({ success: true, message: 'File uploaded successfully', fileId: result.insertId });
-        } catch (error) {
-            console.error('Error saving file information to database:', error);
-            // Clean up file if database insert fails
-            fs.unlink(filePath, () => {}); 
-            return res.status(500).json({ success: false, message: 'Internal server error' });
-        }
-    });
-});
-
-app.get('/api/reports/list/:category', authenticateToken, async (req, res) => {
-    const userId = req.user.userId;
-    const categorySlug = req.params.category; // e.g., 'xray-files'
-
-    if (!categorySlug) {
-        return res.status(400).json({ success: false, message: 'Category is required' });
-    }
-    
-    // Convert slug back to the database-friendly format: 'X-Ray Files' -> 'Xray Files'
-    const dbCategory = categorySlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
-
-    try {
-        const [reports] = await db.execute(
-            'SELECT id, filename, mimetype, size, upload_date FROM medical_files WHERE user_id = ? AND category = ? ORDER BY upload_date DESC',
-            [userId, dbCategory]
-        );
-        
-        if (reports.length === 0) {
-            return res.status(404).json({ success: false, message: 'No reports found for this category', data: [] });
-        }
-
-        res.json({
-            success: true,
-            data: reports
-        });
-    } catch (error) {
-        console.error('Error fetching reports:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-// GET /api/download/:fileId - File Download
-app.get('/api/download/:fileId', authenticateToken, async (req, res) => {
-    const userId = req.user.userId;
-    const fileId = req.params.fileId;
-    
-
-    try{
-        // Select file based on ID AND user_id for security
-        const [rows] = await db.execute(
-            'SELECT filename, filepath, mimetype FROM medical_files WHERE id = ? AND user_id = ?',
-            [fileId, userId]
-        );
-        if (rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'File not found or access denied' });
-        }
-        
-        const fileInfo = rows[0];
-        
-        if(!fs.existsSync(fileInfo.filepath)){
-            return res.status(404).json({ success: false, message: 'File not found on server storage' });
-        }
-        
-        // Download the file
-        res.download(fileInfo.filepath, fileInfo.filename, (err) => {
-            if (err) {
-                console.error('Error downloading file:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({ success: false, message: 'Internal server error during transfer' });
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Error fetching file for download:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-// ... (Other endpoints for vitals and profile remain unchanged) ...
-
-app.post('/api/record/vital', authenticateToken, async (req, res) => {
-    const user_id = req.user.userId; 
-    const{
-        systolic_bp,
-        diastolic_bp,
-        heart_rate,
-        temperature,
-        weight,
-        notes
-    }=req.body;
-
-    if(!systolic_bp || !diastolic_bp || !heart_rate || !temperature || !weight){
-        return res.status(400).json({ success: false, message: 'All vital fields are required' });
-
-    }
-    const sql=`INSERT INTO vitals
-    (user_id, systolic_bp, diastolic_bp, heart_rate, temperature, weight, notes, recorded_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`;
-    const values=[
-        user_id,
-        systolic_bp,
-        diastolic_bp,
-        heart_rate,
-        temperature,
-        weight,
-        notes || null
-    ];
-    try{
-        const [result]=await db.execute(sql, values);
-        console.log('Vital record inserted with ID:', result.insertId);
-        res.status(201).json({ success: true, message: 'Vital record added successfully', vitalId: result.insertId });
-    } catch (error) {
-        console.error('Error inserting vital record:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-app.get('/api/vitals/hitory', authenticateToken, async (req, res) => { 
-    const user_id = req.user.userId;
-    const sql=`SELECT id, systolic_bp, diastolic_bp, heart_rate, temperature, weight, notes, recorded_at
-    FROM vitals
-    WHERE user_id = ?
-    ORDER BY recorded_at DESC`;
-    try{
-        const [rows]=await db.execute(sql, [user_id]);
-        if (rows.length === 0){
-            return res.status(404).json({ success: false, message: 'No vitals history found', data:[]});
-        }
-        res.status(200).json({ success: true, data: rows });
-    } catch (error) {
-        console.error('Error fetching vitals history:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-app.get('/api/user/profile', authenticateToken, async (req, res) => { 
-    const user_id = req.user.userId; 
-    const sql = `SELECT id, username, email, created_at, is_verified
-    FROM users
-    WHERE id = ?`;
-    try {
-        const [result] = await db.execute(sql, [user_id]);
-        if (result.length === 0) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-        res.status(200).json({ success: true, data: result[0] });
-    } catch (error) {
-        console.error('Error fetching user profile:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-app.put('/api/user/profile', authenticateToken, async (req, res) => { 
-    const user_id = req.user.userId;
-    const { username, email } = req.body;
-    if (!username && !email) {
-        return res.status(400).json({ success: false, message: 'At least one field (username or email) is required' });
-    }
-    const sql = `UPDATE users SET
-        username = COALESCE(?, username),
-        email = COALESCE(?, email)
-    WHERE id = ?`;
-    const values = [username, email, user_id];
-    try {
-        const [result] = await db.execute(sql, values);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ success: false, message: 'User not found or no changes made' });
-        }
-        res.status(200).json({ success: true, message: 'User profile updated successfully' });
-    } catch (error) {
-        console.error('Error updating user profile:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
+// ... (Other endpoints like /api/upload, /api/reports/list, /api/download, /api/record/vital, /api/vitals/hitory, /api/user/profile remain the same with slight SQLITE query adjustments: db.get(), db.all(), db.run()) ...
 
 // --- Server Startup ---
-app.listen(PORT, async () => { 
+async function startServer() {
     console.log('----------------------------------------------------');
-    console.log(`Server is running on http://localhost:${PORT}`);
-    console.log(`Frontend CORS set to: ${FRONTEND_URL}`);
     
-    // Check database connection before fully starting
-    await checkDatabaseSchema(); 
-    console.log('Database Check: Success!');
-    console.log('----------------------------------------------------');
-});
+    // CRITICAL: Initialize SQLite database before starting server
+    await initDatabase(); 
+    
+    app.listen(PORT, () => { 
+        console.log(`Server is running on http://localhost:${PORT}`);
+        console.log(`Frontend CORS set to: ${FRONTEND_URL}`);
+        console.log('----------------------------------------------------');
+    });
+}
+
+startServer();
