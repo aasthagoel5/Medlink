@@ -1,4 +1,3 @@
-JWT_SECRET="TThisIsAComplexAndLongStringThatShouldBeKeptSecret1234567890"
 {
   "name": "medlink-backend",
   "version": "1.0.0",
