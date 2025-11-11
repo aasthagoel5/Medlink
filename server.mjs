@@ -1,13 +1,11 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import nodemailer from 'nodemailer';
-import {open} from 'sqlite';
+import { open } from 'sqlite'; 
 import sqlite3 from 'sqlite3';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import 'process/config'; // Loads environment variables from .env
-console.log("--- DEBUG: EMAIL USER ---", process.env.EMAIL_USER); // <--- ADD THIS
-console.log("--- DEBUG: EMAIL PASS ---", process.env.EMAIL_PASS); // <--- ADD THIS
+import 'dotenv/config'; // Loads environment variables from .env
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
@@ -15,42 +13,38 @@ import path from 'path';
 // --- Configuration Constants ---
 const JWT_SECRET = process.env.JWT_SECRET || 'FALLBACK_SECRET'; 
 const PORT = process.env.PORT || 3000;
-const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+// Note: Changed FRONTEND_URL to '*' for maximum local CORS compatibility
+const FRONTEND_URL = process.env.FRONTEND_URL || '*'; 
 const saltRounds = 10;
 
 // --- DATABASE: SQLite Configuration ---
-// The entire database will be stored in this file.
 const DB_FILE = './medlink.db';
 let db; // This variable will hold our SQLite connection.
 
-// --- OTP Storage: In-Memory Object (Simple Replacement for Redis) ---
-// Keys: userId, Values: { otp: '1234', expires: 1678888888 }
+// --- OTP Storage: In-Memory Object (Wipes on server restart) ---
 const otpStore = {}; 
 
 const app = express();
 
 
 // ====================================================================
-// YOU SHOULD NOT REMOVE THESE PARTS: Utilities & Middleware
+// Utilities & Middleware
 // ====================================================================
 
-// --- Utility Functions ---
+// --- Nodemailer Configuration (Uses .env) ---
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    auth: { 
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS
+    }
+});
 
 function generateOTP() {
     return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 async function sendOTPEmail(to, otp) {
-    // ... (Your Nodemailer setup remains the same)
-    // NOTE: For this to work, EMAIL_USER and EMAIL_PASS must be in .env
-    const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: { 
-            user: process.env.EMAIL_USER, 
-            pass: process.env.EMAIL_PASS
-        }
-    });
-
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: to,
@@ -59,15 +53,14 @@ async function sendOTPEmail(to, otp) {
     };
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`OTP email sent to ${to}`);
+        console.log(`OTP email sent successfully to ${to}`);
     } catch (error) {
-        // We need to catch this but let the registration proceed to OTP screen
-        console.error(`Error sending OTP email to ${to}:`, error.message);
+        // Log the error but DO NOT crash the server, so the client receives the userId.
+        console.error(`ERROR: Failed to send OTP email to ${to}:`, error.message);
     }
 }
 
 function authenticateToken(req, res, next) {
-    // ... (Your JWT token verification remains the same)
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) return res.status(401).json({ success: false, message: 'No token provided' });
@@ -80,7 +73,6 @@ function authenticateToken(req, res, next) {
 }
 
 // --- Multer Configuration ---
-// ... (Your Multer setup remains the same)
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         const uploadDir = 'uploads/';
@@ -102,6 +94,7 @@ const upload = multer({
 
 // --- Express Middleware ---
 app.use(bodyParser.json());
+app.use(express.static(path.join(process.cwd(), '')));
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', FRONTEND_URL); 
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -114,7 +107,7 @@ app.use((req, res, next) => {
 });
 
 // ====================================================================
-// DATABASE INITIALIZATION (NEW/CHANGED PART)
+// DATABASE INITIALIZATION
 // ====================================================================
 
 async function initDatabase() {
@@ -125,7 +118,7 @@ async function initDatabase() {
             driver: sqlite3.Database
         });
 
-        // 1. Create the users table
+        // Create all necessary tables
         await db.exec(`
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,9 +128,6 @@ async function initDatabase() {
                 created_at TEXT DEFAULT (datetime('now', 'localtime')),
                 is_verified INTEGER DEFAULT 0
             );
-        `);
-        // 2. Create the vitals table
-        await db.exec(`
             CREATE TABLE IF NOT EXISTS vitals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
@@ -150,9 +140,6 @@ async function initDatabase() {
                 recorded_at TEXT DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
-        `);
-        // 3. Create the medical_files table
-        await db.exec(`
             CREATE TABLE IF NOT EXISTS medical_files (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
@@ -174,8 +161,35 @@ async function initDatabase() {
 }
 
 
+// server.mjs
+
+// ... (after initDatabase function) ...
+
+async function clearAllUsers() {
+    try {
+        console.log("--- STARTING DATABASE CLEANUP ---");
+        
+        // 1. Delete all records from tables dependent on users (Vitals and Files)
+        await db.run("DELETE FROM vitals");
+        await db.run("DELETE FROM medical_files");
+        console.log("Cleaned dependent tables: vitals and medical_files.");
+
+        // 2. Delete ALL records from the users table
+        const result = await db.run("DELETE FROM users");
+        console.log(`SUCCESS: Deleted ${result.changes} user record(s) from 'users' table.`);
+        
+        // 3. Reset the AUTOINCREMENT counter (SQLite specific command)
+        await db.run("DELETE FROM sqlite_sequence WHERE name='users'");
+        console.log("SUCCESS: Reset user ID counter.");
+
+        console.log("--- DATABASE CLEANUP COMPLETE ---");
+    } catch (error) {
+        console.error("ERROR during database cleanup:", error);
+    }
+}
+
 // ====================================================================
-// API Endpoints (MODIFIED FOR SQLITE SYNTAX)
+// API Endpoints
 // ====================================================================
 
 // POST /api/register - User Registration
@@ -187,7 +201,7 @@ app.post('/api/register', async (req, res) => {
     }
     
     try {
-        // Check for existing user first (due to UNIQUE constraint handling differences)
+        // Check for existing user first (SQLite specific check)
         const existingUser = await db.get('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
         if (existingUser) {
             return res.status(409).json({ success: false, message: 'Username or email already exists.' });
@@ -201,21 +215,20 @@ app.post('/api/register', async (req, res) => {
             [username, email, hashedPassword]
         );
         
-        const userId = result.lastID; // SQLite uses lastID instead of insertId
+        const userId = result.lastID;
         
         if (!userId) {
             throw new Error("Database insert failed: No user ID returned.");
         }
 
-        // server.mjs - inside app.post('/api/register', ...)
-// ...
-// OTP Generation and In-Memory Storage
+        // OTP Generation and In-Memory Storage
         const otp = generateOTP(); 
-        console.log(`NEW USER OTP IS: ${otp}`); // <--- ADD THIS LINE
         const otp_expire = Date.now() + (5 * 60 * 1000); 
         otpStore[userId] = { otp, expires: otp_expire };
-        // ...
-        // Send Email
+        
+        console.log(`*** NEW USER OTP IS: ${otp} for User ID: ${userId} ***`); 
+
+        // Send Email (Error will be logged but won't crash the server)
         await sendOTPEmail(email, otp);
         
         // Final Success Response
@@ -237,14 +250,12 @@ app.post('/api/login', async (req, res) => {
     }
 
     try {
-        // SQLite: use db.get() for a single row
         const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
         
         if (!user) {
             return res.status(400).json({ success: false, message: 'Invalid email or password' });
         }
         
-        // Compare hashed password
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) {
             return res.status(401).json({ success: false, message: 'Invalid email or password' });
@@ -274,7 +285,7 @@ app.post('/api/resend-otp', async (req, res) => {
         }
         const userEmail = user.email;
         
-        // In-Memory OTP Storage (Replaces Redis logic)
+        // In-Memory OTP Storage
         const newotp = generateOTP();
         const otp_expire = Date.now() + (5 * 60 * 1000); 
         otpStore[userId] = { otp: newotp, expires: otp_expire };
@@ -300,10 +311,12 @@ app.post('/api/verify-otp', async (req, res) => {
     try {
         const storedOtpData = otpStore[userId];
         
+        // Check for missing OTP or expiration
         if (!storedOtpData || storedOtpData.expires < Date.now()) {
             return res.status(404).json({ success: false, message: 'OTP not found or expired' });
         }
         
+        // Check for invalid code
         if (otp !== storedOtpData.otp) {
             return res.status(400).json({ success: false, message: 'Invalid OTP' });
         }
@@ -316,7 +329,7 @@ app.post('/api/verify-otp', async (req, res) => {
             [userId]
         );
         
-        if (updateResult.changes === 0) { // SQLite uses .changes instead of affectedRows
+        if (updateResult.changes === 0) {
             return res.status(404).json({ success: false, message: 'Verification failed: User not found.' });
         }
         
@@ -341,8 +354,15 @@ app.post('/api/verify-otp', async (req, res) => {
     }
 });
 
+// --- Other Endpoints (Truncated for brevity, but exist in full code) ---
+// app.post('/api/upload', authenticateToken, ...
+// app.get('/api/reports/list/:category', authenticateToken, ...
+// app.get('/api/download/:fileId', authenticateToken, ...
+// app.post('/api/record/vital', authenticateToken, ...
+// app.get('/api/vitals/hitory', authenticateToken, ...
+// app.get('/api/user/profile', authenticateToken, ...
+// app.put('/api/user/profile', authenticateToken, ...
 
-// ... (Other endpoints like /api/upload, /api/reports/list, /api/download, /api/record/vital, /api/vitals/hitory, /api/user/profile remain the same with slight SQLITE query adjustments: db.get(), db.all(), db.run()) ...
 
 // --- Server Startup ---
 async function startServer() {
@@ -350,7 +370,6 @@ async function startServer() {
     
     // CRITICAL: Initialize SQLite database before starting server
     await initDatabase(); 
-    
     app.listen(PORT, () => { 
         console.log(`Server is running on http://localhost:${PORT}`);
         console.log(`Frontend CORS set to: ${FRONTEND_URL}`);

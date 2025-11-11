@@ -86,8 +86,8 @@ confirmBtn.addEventListener('click', async (e) => {
             clearInterval(countdownInterval);
             
             // CRITICAL STEP: Save the JWT token received from the server
-            localStorage.setItem('medlink_token', result.token); 
-            sessionStorage.removeItem('medlink_userId'); // Clean up user ID from session
+            //localStorage.setItem('medlink_token', result.token); 
+            //sessionStorage.removeItem('medlink_userId'); // Clean up user ID from session
             
             window.location.href = 'index.html'; // Redirect to dashboard
             
