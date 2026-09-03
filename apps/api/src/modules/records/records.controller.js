@@ -1,39 +1,37 @@
 const Record = require('./records.model');
 const { extractTextFromImage } = require('../../lib/ocrClient');
 
-const createRecord = async  (req, res) => {
-  try{
-    if(!req.file){
-      return res.status(400).json({message: 'No file uploaded'});
+const createRecord = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const {type, doctorName, notes, recordDate} = req.body;
+    const { type, doctorName, notes, recordDate } = req.body;
 
-    // try OCR — but don't let it block the whole upload if it fails
-    let extractedText = '';
-    let ocrConfidence = null;
-    try {
-      const ocrResult = await extractTextFromImage(req.file.path);
-      extractedText = ocrResult.text;
-      ocrConfidence = ocrResult.confidence;
-    } catch (ocrErr) {
-      console.error('OCR failed, saving record without extracted text:', ocrErr.message);
-    }
-
+    // create the record first, so we have a real recordId to tag the embeddings with
     const record = await Record.create({
-      owner: req.userId,  //set by the auth middleware, see step 4
+      owner: req.userId,
       type,
-      fileUrl: req.file.path, // Cloudinary gives back the hosted URL here
+      fileUrl: req.file.path,
       doctorName,
       notes,
       recordDate,
-      extractedText,
-      ocrConfidence
     });
 
+    // now run OCR + embedding, and update the record with the results
+    try {
+      const ocrResult = await extractTextFromImage(req.file.path, req.userId.toString(), record._id.toString());
+      record.extractedText = ocrResult.text;
+      record.ocrConfidence = ocrResult.confidence;
+      await record.save();
+    } catch (ocrErr) {
+      console.error('OCR failed, record saved without extracted text:', ocrErr.message);
+    }
+
     res.status(201).json(record);
-  }catch(err){
-    res.status(500).json({message: 'Upload failed', error: err.message});
+  } catch (err) {
+    res.status(500).json({ message: 'Upload failed', error: err.message });
   }
 };
 
