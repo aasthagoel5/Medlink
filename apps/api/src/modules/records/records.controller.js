@@ -1,4 +1,5 @@
 const Record = require('./records.model');
+const { extractTextFromImage } = require('../../lib/ocrClient');
 
 const createRecord = async  (req, res) => {
   try{
@@ -8,6 +9,17 @@ const createRecord = async  (req, res) => {
 
     const {type, doctorName, notes, recordDate} = req.body;
 
+    // try OCR — but don't let it block the whole upload if it fails
+    let extractedText = '';
+    let ocrConfidence = null;
+    try {
+      const ocrResult = await extractTextFromImage(req.file.path);
+      extractedText = ocrResult.text;
+      ocrConfidence = ocrResult.confidence;
+    } catch (ocrErr) {
+      console.error('OCR failed, saving record without extracted text:', ocrErr.message);
+    }
+
     const record = await Record.create({
       owner: req.userId,  //set by the auth middleware, see step 4
       type,
@@ -15,6 +27,8 @@ const createRecord = async  (req, res) => {
       doctorName,
       notes,
       recordDate,
+      extractedText,
+      ocrConfidence
     });
 
     res.status(201).json(record);

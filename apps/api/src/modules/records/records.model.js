@@ -8,6 +8,8 @@ const recordSchema = new mongoose.Schema({
     required: true
   },
   fileUrl: {type: String, required: true},
+  extractedText: {type: String},
+  ocrConfidence: {type: Number},
   doctorName: {type: String},
   notes: {type: String },
   recordDate: {type: Date},
