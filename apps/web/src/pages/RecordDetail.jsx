@@ -102,15 +102,48 @@ export default function RecordDetail() {
               )}
             </div>
 
-            {/* AI summary placeholder — Phase 2 */}
-            <div className="p-4 rounded-xl bg-[#F0FDFF] border border-[#C8E4F0] mb-6">
-              <p className="text-xs font-semibold text-[#0891B2] mb-1">
-                AI Summary
-              </p>
-              <p className="text-xs text-slate-400">
-                Coming in a future update.
-              </p>
-            </div>
+            {/* Extracted text from OCR */}
+            {record.extractedText && (
+              <div className="p-4 rounded-xl bg-[#F0FDFF] border border-[#C8E4F0] mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-[#0891B2]">
+                    Extracted Text
+                  </p>
+                  {record.ocrConfidence !== null &&
+                    record.ocrConfidence !== undefined && (
+                      <span
+                        className={`text-xs font-medium ${
+                          record.ocrConfidence >= 80
+                            ? "text-emerald-600"
+                            : record.ocrConfidence >= 50
+                              ? "text-amber-600"
+                              : "text-red-500"
+                        }`}
+                      >
+                        {record.ocrConfidence >= 80
+                          ? "High confidence"
+                          : record.ocrConfidence >= 50
+                            ? "Medium confidence"
+                            : "Low confidence — please verify"}
+                      </span>
+                    )}
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line max-h-48 overflow-y-auto">
+                  {record.extractedText}
+                </p>
+              </div>
+            )}
+
+            {!record.extractedText && (
+              <div className="p-4 rounded-xl bg-[#F0FDFF] border border-[#C8E4F0] mb-6">
+                <p className="text-xs font-semibold text-[#0891B2] mb-1">
+                  Extracted Text
+                </p>
+                <p className="text-xs text-slate-400">
+                  No text could be extracted from this file.
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button
