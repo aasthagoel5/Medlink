@@ -218,8 +218,7 @@ export default function Auth() {
       });
       localStorage.setItem("medlink_token", data.token);
       localStorage.setItem("medlink_user", JSON.stringify(data.user));
-      navigate("/dashboard");
-    } catch (err) {
+      navigate("/profile-setup");
       setError(
         err.response?.data?.message ||
           "Something went wrong. Please try again.",
