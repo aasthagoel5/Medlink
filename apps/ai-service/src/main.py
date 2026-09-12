@@ -4,12 +4,15 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.modules.ocr.ocr_routes import router as ocr_router
-from src.modules.embeddings.qdrant_client import ensure_collection_exists
+from src.modules.embeddings.qdrant_client import ensure_collection_exists, ensure_userid_index_exists
+from src.modules.chat.chat_routes import router as chat_router 
 
 
 
 app = FastAPI()
+app.include_router(chat_router)
 ensure_collection_exists()
+ensure_userid_index_exists()
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,6 +22,7 @@ app.add_middleware(
 )
 
 app.include_router(ocr_router)
+app.include_router(chat_router)
 
 @app.get("/health")
 def health_check():

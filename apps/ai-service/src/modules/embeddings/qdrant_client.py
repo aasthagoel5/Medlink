@@ -1,6 +1,7 @@
 import os
 from qdrant_client import QdrantClient
-from qdrant_client.models import  VectorParams, Distance
+from qdrant_client.models import  PayloadSchemaType, VectorParams, Distance
+from qdrant_client.models import PayloadSchemaType
 
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
@@ -22,3 +23,11 @@ def ensure_collection_exists():
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
         )
+
+
+def ensure_userid_index_exists():
+    client.create_payload_index(
+        collection_name=COLLECTION_NAME,
+        field_name="userId",
+        field_schema=PayloadSchemaType.KEYWORD,
+    )
